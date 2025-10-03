@@ -1,8 +1,7 @@
-// @ts-nocheck
-/* eslint-disable */
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
 type AttendanceRow = {
@@ -14,7 +13,8 @@ type AttendanceRow = {
   note?: string | null;
 };
 
-export default function RekapPage(): JSX.Element {
+const RekapPage: React.FC = () => {
+  const router = useRouter();
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
@@ -71,29 +71,13 @@ export default function RekapPage(): JSX.Element {
     return `${h}:${m}:${s || "00"}`;
   };
 
-  const mapRows = rows.map((r) => {
-    const isToday = r.date === todayStr;
-    return (
-      <tr
-        key={r.id}
-        className={`border-b last:border-b-0 ${
-          isToday ? "bg-blue-50 font-semibold" : ""
-        }`}
-      >
-        <td className="py-2 px-3">{r.date}</td>
-        <td className="py-2 px-3">{formatTime(r.check_in)}</td>
-        <td className="py-2 px-3">{formatTime(r.check_out)}</td>
-      </tr>
-    );
-  });
-
   return (
     <div className="min-h-screen bg-sky-400 flex flex-col items-center p-4">
+      {/* Header */}
       <header className="w-full flex justify-center">
         <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
-          {/* Tombol Back */}
-          <a
-            href="/dashboard"
+          <button
+            onClick={() => router.back()}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
           >
             <svg
@@ -110,15 +94,13 @@ export default function RekapPage(): JSX.Element {
                 d="M15.75 19.5L8.25 12l7.5-7.5"
               />
             </svg>
-          </a>
-
-          {/* Judul */}
+          </button>
           <h2 className="ml-3 text-base font-semibold">Rekap Presensi</h2>
         </div>
       </header>
 
+      {/* Card Rekap Presensi */}
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-4 mt-8">
-        {/* Header judul */}
         <h1 className="text-lg font-semibold text-sky-700 mb-1">
           Rekap Presensi
         </h1>
@@ -150,7 +132,7 @@ export default function RekapPage(): JSX.Element {
           />
         </div>
 
-        {/* Table */}
+        {/* Tabel Presensi */}
         <div className="overflow-x-auto">
           <table className="w-full table-auto border rounded text-sm">
             <thead className="bg-gray-50">
@@ -174,18 +156,33 @@ export default function RekapPage(): JSX.Element {
                   </td>
                 </tr>
               ) : (
-                mapRows
+                rows.map((r) => {
+                  const isToday = r.date === todayStr;
+                  return (
+                    <tr
+                      key={r.id}
+                      className={`border-b last:border-b-0 ${
+                        isToday ? "bg-blue-50 font-semibold" : ""
+                      }`}
+                    >
+                      <td className="py-2 px-3">{r.date}</td>
+                      <td className="py-2 px-3">{formatTime(r.check_in)}</td>
+                      <td className="py-2 px-3">{formatTime(r.check_out)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Note */}
         <p className="text-xs text-gray-500 mt-3">
-          Note : Terkadang dibutuhkan waktu dalam proses penyajian data
-          mengingat kondisi jaringan dan server
+          Note: Terkadang dibutuhkan waktu dalam proses penyajian data mengingat
+          kondisi jaringan dan server
         </p>
       </div>
     </div>
   );
-}
+};
+
+export default RekapPage;
