@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient"; // pastikan path ini benar di projectmu
+import { supabase } from "../lib/supabaseClient"; // pastikan path ini benar di projectmu
 
 type AttendanceRow = {
   id: string;
