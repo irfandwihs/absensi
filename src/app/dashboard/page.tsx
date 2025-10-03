@@ -21,7 +21,7 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState<string>("");
   const [dateString, setDateString] = useState<string>("");
   const [todayISO, setTodayISO] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date().toLocaleDateString("sv-SE") // format lokal YYYY-MM-DD
   );
   const [toast, setToast] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,7 +30,7 @@ export default function Dashboard() {
   // ambil data user & attendance
   useEffect(() => {
     const loadUserAndAttendance = async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("sv-SE");
       try {
         const {
           data: { user },
@@ -100,10 +100,10 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // cron-like untuk reset ketika ganti hari
+  // cron-like untuk reset ketika ganti hari (lokal)
   useEffect(() => {
     const cron = setInterval(() => {
-      const nowISO = new Date().toISOString().split("T")[0];
+      const nowISO = new Date().toLocaleDateString("sv-SE");
       if (nowISO !== todayISO) {
         // reset data ke hari baru
         setTodayISO(nowISO);
@@ -150,11 +150,9 @@ export default function Dashboard() {
           {menuOpen && (
             <div className="mt-2 bg-white rounded shadow p-2 text-sm">
               {isAuthenticated ? (
-                <>
-                  <a href="/profile" className="block px-2 py-1 text-sky-700">
-                    Profile
-                  </a>
-                </>
+                <a href="/profile" className="block px-2 py-1 text-sky-700">
+                  Profil
+                </a>
               ) : (
                 <a href="/login" className="block px-2 py-1 text-sky-700">
                   Login
@@ -211,7 +209,7 @@ export default function Dashboard() {
         <section className="grid grid-cols-2 gap-4 mt-5">
           <a
             href="/presensi"
-            className="bg-white rounded-lg p-4 flex flex-col items-center shadow"
+            className="bg-white rounded-lg p-4 flex flex-col items-center shadow text-gray-700"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -231,7 +229,7 @@ export default function Dashboard() {
           </a>
           <a
             href="/rekap"
-            className="bg-white rounded-lg p-4 flex flex-col items-center shadow"
+            className="bg-white rounded-lg p-4 flex flex-col items-center shadow text-gray-700"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

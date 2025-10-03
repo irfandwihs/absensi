@@ -16,6 +16,9 @@ export default function PresensiPage() {
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const pad = (n: number) => String(n).padStart(2, "0");
 
+  // helper: ambil tanggal lokal dengan format YYYY-MM-DD
+  const getToday = () => new Date().toLocaleDateString("sv-SE");
+
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -27,12 +30,11 @@ export default function PresensiPage() {
           .from("attendance")
           .select("*")
           .eq("user_id", user.id)
-          .eq("date", new Date().toISOString().split("T")[0])
+          .eq("date", getToday())
           .single();
         setAttendance(data);
       }
     };
-    // removed incidental time calculations from useEffect
     getUser();
   }, []);
 
@@ -43,10 +45,8 @@ export default function PresensiPage() {
     const timeForDb = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
       now.getSeconds()
     )}`;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getToday();
 
-    // Try to insert; if a row already exists for (user_id,date), fall back to update
-    // call server endpoint to write attendance (service role key used server-side)
     const res = await fetch("/api/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,76 +58,20 @@ export default function PresensiPage() {
       }),
     });
     const insertJson = await res.json().catch(() => ({}));
-    console.log(
-      "[presensi] /api/attendance insert response:",
-      insertJson,
-      res.status
-    );
-    const insertError = insertJson?.error;
+    console.log("[presensi] check_in response:", insertJson, res.status);
 
     try {
       localStorage.setItem("absen-toast", `Masuk: ${displayTime}`);
+      localStorage.removeItem("absen-fallback");
     } catch {}
 
-    if (insertError) {
-      // attempt to update existing row's check_in
-      try {
-        // call server endpoint to update check_in
-        try {
-          const updRes = await fetch("/api/attendance", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: user.id,
-              type: "in",
-              time: timeForDb,
-              date: today,
-            }),
-          });
-          const updJson = await updRes.json().catch(() => ({}));
-          console.log(
-            "[presensi] /api/attendance update check_in:",
-            updJson,
-            updRes.status
-          );
-          try {
-            localStorage.removeItem("absen-fallback");
-          } catch {}
-        } catch (e) {
-          console.error("[presensi] failed update check_in", e);
-          try {
-            localStorage.setItem(
-              "absen-fallback",
-              JSON.stringify({ check_in: timeForDb, date: today })
-            );
-          } catch {}
-        }
-      } catch (e) {
-        console.error("[presensi] failed update check_in", e);
-        try {
-          localStorage.setItem(
-            "absen-fallback",
-            JSON.stringify({ check_in: displayTime, date: today })
-          );
-        } catch {}
-      }
-    } else {
-      try {
-        localStorage.removeItem("absen-fallback");
-      } catch {}
-    }
-
-    // update local state immediately for UI
     setAttendance(
       (prev) =>
         ({ ...(prev ?? {}), check_in: displayTime, date: today } as Attendance)
     );
-    // redirect to dashboard so the new time appears there (dashboard reads absen-toast / attendance)
     try {
       window.location.href = "/dashboard";
-    } catch {
-      // ignore in non-browser environments
-    }
+    } catch {}
   };
 
   const handleCheckOut = async () => {
@@ -137,10 +81,9 @@ export default function PresensiPage() {
     const timeForDb = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
       now.getSeconds()
     )}`;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getToday();
 
-    // call server endpoint to set check_out
-    const outRes = await fetch("/api/attendance", {
+    const res = await fetch("/api/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -150,41 +93,20 @@ export default function PresensiPage() {
         date: today,
       }),
     });
-    const outJson = await outRes.json().catch(() => ({}));
-    console.log(
-      "[presensi] /api/attendance check_out:",
-      outJson,
-      outRes.status
-    );
-    const error = outJson?.error;
+    const outJson = await res.json().catch(() => ({}));
+    console.log("[presensi] check_out response:", outJson, res.status);
 
     try {
       localStorage.setItem("absen-toast", `Pulang: ${displayTime}`);
+      localStorage.removeItem("absen-fallback");
     } catch {}
 
-    if (error) {
-      try {
-        localStorage.setItem(
-          "absen-fallback",
-          JSON.stringify({ check_out: displayTime, date: today })
-        );
-      } catch {}
-    } else {
-      try {
-        localStorage.removeItem("absen-fallback");
-      } catch {}
-    }
-
-    // update local state immediately for UI
     setAttendance(
       (prev) => ({ ...(prev ?? {}), check_out: displayTime } as Attendance)
     );
-    // redirect to dashboard to show the pulang time
     try {
       window.location.href = "/dashboard";
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   return (
@@ -234,7 +156,6 @@ export default function PresensiPage() {
         </div>
 
         <div className="w-full mt-6 text-center text-white/90">
-          {/* Small helper text showing current state */}
           {attendance?.check_in && (
             <div className="mb-1">Masuk: {attendance.check_in}</div>
           )}

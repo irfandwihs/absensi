@@ -61,11 +61,30 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-500 to-sky-300 p-4 flex flex-col items-center">
-      <header className="w-full max-w-md mt-4 text-white flex items-center">
-        <a href="/dashboard" className="mr-3 text-lg">
-          ←
-        </a>
-        <h2 className="text-lg font-semibold">Profile</h2>
+      <header className="w-full flex justify-center">
+        <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
+          <a
+            href="/dashboard"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
+            aria-label="Kembali"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
+            </svg>
+          </a>
+          <h2 className="ml-3 text-base font-semibold">Profil</h2>
+        </div>
       </header>
 
       <main className="w-full max-w-md mt-6 rounded-xl overflow-hidden">

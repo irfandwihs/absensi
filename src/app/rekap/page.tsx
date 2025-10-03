@@ -122,7 +122,7 @@ const RekapPage: React.FC = () => {
           <select
             value={month}
             onChange={(e) => setMonth(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm text-gray-700"
           >
             {Array.from({ length: 12 }).map((_, i) => (
               <option key={i} value={i + 1}>
@@ -136,7 +136,7 @@ const RekapPage: React.FC = () => {
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="border rounded px-2 py-1 w-20 text-sm"
+            className="border rounded px-2 py-1 w-20 text-sm text-gray-700"
           />
         </div>
 
@@ -144,9 +144,9 @@ const RekapPage: React.FC = () => {
           <table className="w-full table-auto border rounded text-sm">
             <thead className="bg-gray-50">
               <tr className="border-b">
-                <th className="py-2 px-3 text-left">Tanggal</th>
-                <th className="py-2 px-3 text-left">Masuk</th>
-                <th className="py-2 px-3 text-left">Pulang</th>
+                <th className="py-2 px-3 text-left text-gray-700">Tanggal</th>
+                <th className="py-2 px-3 text-left text-gray-700">Masuk</th>
+                <th className="py-2 px-3 text-left text-gray-700">Pulang</th>
               </tr>
             </thead>
             <tbody>
@@ -172,9 +172,13 @@ const RekapPage: React.FC = () => {
                         isToday ? "bg-blue-50 font-semibold" : ""
                       }`}
                     >
-                      <td className="py-2 px-3">{r.date}</td>
-                      <td className="py-2 px-3">{formatTime(r.check_in)}</td>
-                      <td className="py-2 px-3">{formatTime(r.check_out)}</td>
+                      <td className="py-2 px-3 text-gray-700">{r.date}</td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {formatTime(r.check_in)}
+                      </td>
+                      <td className="py-2 px-3 text-gray-700">
+                        {formatTime(r.check_out)}
+                      </td>
                     </tr>
                   );
                 })
