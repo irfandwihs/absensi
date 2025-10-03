@@ -17,7 +17,7 @@ type AttendanceRow = {
 export default function RekapPage(): JSX.Element {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
+  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
@@ -60,77 +60,104 @@ export default function RekapPage(): JSX.Element {
     };
   }, [month, year]);
 
-  const formatTime = (t?: string | null) => {
-    if (!t) return "";
-    const [h, m] = t.split(":");
-    if (!h) return t;
-    return `${h.padStart(2, "0")}:${m?.padStart(2, "0") || "00"}`;
-  };
-
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(
     today.getMonth() + 1
   ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const formatTime = (t?: string | null) => {
+    if (!t) return "";
+    const [h, m, s] = t.split(":");
+    return `${h}:${m}:${s || "00"}`;
+  };
 
   const mapRows = rows.map((r) => {
     const isToday = r.date === todayStr;
     return (
       <tr
         key={r.id}
-        className={`border-b last:border-b-0 ${isToday ? "bg-blue-50" : ""}`}
+        className={`border-b last:border-b-0 ${
+          isToday ? "bg-blue-50 font-semibold" : ""
+        }`}
       >
-        <td className="py-3 px-2 align-top">
-          <div className="text-xs text-gray-600">{r.date}</div>
-        </td>
-        <td className="py-3 px-2 align-top">
-          <div className="font-medium">{formatTime(r.check_in)}</div>
-          <div className="text-xs text-gray-500">{r.note || ""}</div>
-        </td>
-        <td className="py-3 px-2 align-top">
-          <div className="font-medium">{formatTime(r.check_out)}</div>
-          <div className="text-xs text-gray-500">{r.note || ""}</div>
-        </td>
+        <td className="py-2 px-3">{r.date}</td>
+        <td className="py-2 px-3">{formatTime(r.check_in)}</td>
+        <td className="py-2 px-3">{formatTime(r.check_out)}</td>
       </tr>
     );
   });
 
   return (
-    <div className="p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-md p-4">
-        <h1 className="text-2xl font-semibold mb-1">Rekap Presensi</h1>
+    <div className="min-h-screen bg-sky-400 flex flex-col items-center p-4">
+      <header className="w-full flex justify-center">
+        <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
+          {/* Tombol Back */}
+          <a
+            href="/dashboard"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
+            </svg>
+          </a>
+
+          {/* Judul */}
+          <h2 className="ml-3 text-base font-semibold">Rekap Presensi</h2>
+        </div>
+      </header>
+
+      <div className="w-full max-w-md bg-white rounded-lg shadow-md p-4 mt-8">
+        {/* Header judul */}
+        <h1 className="text-lg font-semibold text-sky-700 mb-1">
+          Rekap Presensi
+        </h1>
         <p className="text-sm text-gray-600 mb-4">
-          Presensi Harian anda, {year}
+          Presensi Harian Anda, {year}
         </p>
 
-        <div className="mb-4 flex items-center gap-2">
-          <label className="text-sm">Bulan</label>
+        {/* Filter Bulan & Tahun */}
+        <div className="flex items-center gap-3 mb-4">
+          <label className="text-sm text-gray-600">Bulan</label>
           <select
             value={month}
             onChange={(e) => setMonth(Number(e.target.value))}
-            className="border rounded px-2 py-1"
+            className="border rounded px-2 py-1 text-sm"
           >
             {Array.from({ length: 12 }).map((_, i) => (
               <option key={i} value={i + 1}>
-                {new Date(0, i).toLocaleString(undefined, { month: "long" })}
+                {new Date(0, i).toLocaleString("id-ID", { month: "long" })}
               </option>
             ))}
           </select>
-          <label className="text-sm">Tahun</label>
+
+          <label className="text-sm text-gray-600">Tahun</label>
           <input
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="border rounded px-2 py-1 w-24"
+            className="border rounded px-2 py-1 w-20 text-sm"
           />
         </div>
 
+        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full table-auto text-sm">
-            <thead>
-              <tr className="text-left border-b">
-                <th className="py-2 px-2 w-1/3">Tanggal</th>
-                <th className="py-2 px-2 w-1/3">Masuk</th>
-                <th className="py-2 px-2 w-1/3">Pulang</th>
+          <table className="w-full table-auto border rounded text-sm">
+            <thead className="bg-gray-50">
+              <tr className="border-b">
+                <th className="py-2 px-3 text-left">Tanggal</th>
+                <th className="py-2 px-3 text-left">Masuk</th>
+                <th className="py-2 px-3 text-left">Pulang</th>
               </tr>
             </thead>
             <tbody>
@@ -153,9 +180,10 @@ export default function RekapPage(): JSX.Element {
           </table>
         </div>
 
+        {/* Note */}
         <p className="text-xs text-gray-500 mt-3">
-          Note: Terkadang dibutuhkan waktu dalam proses penyajian data mengingat
-          kondisi jaringan dan server
+          Note : Terkadang dibutuhkan waktu dalam proses penyajian data
+          mengingat kondisi jaringan dan server
         </p>
       </div>
     </div>
