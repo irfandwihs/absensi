@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { FiUserPlus, FiUsers, FiEdit2, FiTrash2 } from "react-icons/fi";
 
 type User = {
   id: string;
@@ -21,152 +22,144 @@ export default function AdminPage() {
   const [jabatan, setJabatan] = useState("");
   const [unitKerja, setUnitKerja] = useState("");
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error" | null>(
-    null
-  );
+  const [activeTab, setActiveTab] = useState<"tambah" | "daftar">("tambah");
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [fetchErrorDetail, setFetchErrorDetail] = useState<string | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
-  const refreshUsers = async () => {
-    setLoadingUsers(true);
-    setFetchErrorDetail(null);
-    try {
-      const res = await fetch("/api/admin-users");
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json?.error || "Gagal mengambil pengguna dari server");
-      }
-      setUsers(json.users || []);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[admin] refreshUsers error:", err);
-      setMessage("Gagal memuat daftar pengguna: " + msg);
-      setMessageType("error");
-      setFetchErrorDetail(msg);
-      setUsers([]);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // protect page: ensure current user has role 'admin'
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        window.location.href = "/login";
-        return;
-      }
-      setCurrentUserEmail(user.email ?? null);
-      const { data } = await supabase
-        .from("users")
-        .select("role")
-        .eq("email", user.email)
-        .single();
-      if (!data || data.role !== "admin") {
-        window.location.href = "/login";
-        return;
-      }
-      // now that we confirmed admin, fetch the users list (ensures session is established for RLS)
-      await refreshUsers();
-    };
-    checkAdmin();
-  }, []);
-
-  const handleAddUser = async () => {
-    setMessage(null);
-    setMessageType(null);
-    // basic validation
-    if (!email || !password || !fullName) {
-      setMessage("Isi semua field yang diperlukan (nama, email, kata sandi)");
-      setMessageType("error");
-      return;
-    }
-    // disable double submit by setting a temporary message
-    setMessage("Mengirim... please wait");
-    setMessageType(null);
-    // Use server API to create auth user and users record
-    const res = await fetch("/api/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-        full_name: fullName,
-        role,
-        jabatan,
-        unit_kerja: unitKerja,
-      }),
-    });
-    const data = await res.json();
-    if (data?.error) {
-      setMessage("Error creating user: " + data.error);
-      setMessageType("error");
-      // clear the temporary sending state after 4s
-      setTimeout(() => setMessage(null), 4000);
-      return;
-    }
-    setMessage("Pengguna berhasil dibuat");
-    setMessageType("success");
+  const resetForm = () => {
     setEmail("");
     setFullName("");
     setPassword("");
     setRole("user");
     setJabatan("");
     setUnitKerja("");
-    await refreshUsers();
-    // auto-clear success message shortly
-    setTimeout(() => setMessage(null), 4000);
   };
 
-  const handleEditInit = (u: User) => {
-    setEditingUser(u);
-    setEmail(u.email || "");
-    setFullName(u.full_name || "");
-    setJabatan(u.jabatan || "");
-    setUnitKerja(u.unit_kerja || "");
+  const refreshUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch("/api/admin-users");
+      const json = await res.json();
+      if (res.ok) {
+        setUsers(json.users || []);
+      } else {
+        console.error("refreshUsers error:", json);
+        alert("Gagal memuat daftar pengguna");
+      }
+    } catch (err) {
+      console.error("refreshUsers unexpected:", err);
+      alert("Terjadi kesalahan saat memuat pengguna");
+    } finally {
+      setLoadingUsers(false);
+    }
   };
 
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
-    // call server API to perform update (uses service role)
+  useEffect(() => {
+    refreshUsers();
+  }, []);
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setFullName(user.full_name || "");
+    setEmail(user.email || "");
+    setJabatan(user.jabatan || "");
+    setUnitKerja(user.unit_kerja || "");
+    setRole(user.role || "user");
+    setPassword("");
+    setActiveTab("daftar"); // tetap di tab daftar saat edit
+  };
+
+  const handleAddUser = async () => {
+    // validasi sederhana
+    if (!email || !fullName || !password) {
+      alert(
+        "Mohon isi Nama, Email, dan Kata Sandi untuk menambahkan pengguna."
+      );
+      return;
+    }
+
+    setAdding(true);
     try {
       const res = await fetch("/api/admin-users", {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editingUser.id,
           email,
           full_name: fullName,
+          password,
           jabatan,
           unit_kerja: unitKerja,
           role,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Gagal menyimpan perubahan");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setMessage("Gagal menyimpan perubahan: " + msg);
-      setMessageType("error");
-      return;
+      if (!res.ok) {
+        console.error("add user error:", json);
+        alert("Gagal menambahkan pengguna: " + (json.error || "server error"));
+        return;
+      }
+
+      // sukses
+      await refreshUsers();
+      resetForm();
+      setActiveTab("daftar");
+      alert("Pengguna berhasil ditambahkan");
+    } catch (err: any) {
+      console.error("add user unexpected:", err);
+      alert("Terjadi kesalahan saat menambahkan pengguna");
+    } finally {
+      setAdding(false);
     }
-    setEditingUser(null);
-    setEmail("");
-    setFullName("");
-    setJabatan("");
-    setUnitKerja("");
-    await refreshUsers();
-    setMessage("Perubahan pengguna tersimpan");
-    setMessageType("success");
   };
 
-  const handleDeleteUser = async (id?: string) => {
-    if (!id) return;
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin-users", {
+        method: "PUT", // sesuai route kamu
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingUser.id,
+          full_name: fullName,
+          email,
+          jabatan,
+          unit_kerja: unitKerja,
+          role,
+          // password tidak dikirim karena route PUT kamu tidak menangani password update.
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        console.error("save edit error:", json);
+        alert("Gagal menyimpan perubahan: " + (json.error || "server error"));
+        return;
+      }
+
+      await refreshUsers();
+      setEditingUser(null);
+      resetForm();
+      alert("Perubahan berhasil disimpan");
+    } catch (err: any) {
+      console.error("save edit unexpected:", err);
+      alert("Terjadi kesalahan saat menyimpan perubahan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUser(null);
+    resetForm();
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm("Yakin ingin menghapus pengguna ini?")) return;
+    setDeletingId(id);
     try {
       const res = await fetch("/api/admin-users", {
         method: "DELETE",
@@ -174,221 +167,264 @@ export default function AdminPage() {
         body: JSON.stringify({ id }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Gagal menghapus pengguna");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setMessage("Gagal menghapus pengguna: " + msg);
-      setMessageType("error");
-      return;
+      if (!res.ok) {
+        console.error("delete error:", json);
+        alert("Gagal menghapus pengguna: " + (json.error || "server error"));
+        return;
+      }
+      await refreshUsers();
+      alert("Pengguna dihapus");
+    } catch (err: any) {
+      console.error("delete unexpected:", err);
+      alert("Terjadi kesalahan saat menghapus pengguna");
+    } finally {
+      setDeletingId(null);
     }
-    await refreshUsers();
-    setMessage("Pengguna dihapus");
-    setMessageType("success");
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex justify-center">
-      <div className="w-full max-w-md">
-        <header className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+    <div className="min-h-screen bg-sky-400 flex justify-center">
+      <div className="w-full max-w-sm bg-sky-100 flex flex-col">
+        {/* HEADER */}
+        <header className="flex justify-between items-center px-4 py-3 bg-sky-500 text-white shadow">
+          <h1 className="text-lg font-semibold">Admin Dashboard</h1>
           <button
             onClick={async () => {
               await supabase.auth.signOut();
               window.location.href = "/login";
             }}
-            className="bg-red-400 text-white px-3 py-1 rounded"
+            className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm"
           >
             Logout
           </button>
         </header>
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="card p-4">
-            <div className="text-xs text-gray-500">Total User</div>
-            <div className="text-xl font-bold text-sky-600">{users.length}</div>
-          </div>
-          <div className="card p-4">
-            <div className="text-xs text-gray-500">Total Admin</div>
-            <div className="text-xl font-bold text-sky-600">
-              {users.filter((u) => u.role === "admin").length}
-            </div>
-          </div>
-          <div className="card p-4">
-            <div className="text-xs text-gray-500">Absensi Hari Ini</div>
-            <div className="text-xl font-bold text-sky-600">-</div>
-          </div>
-        </div>
-        {currentUserEmail && (
-          <div className="text-sm text-gray-500 mb-4">
-            Signed in as {currentUserEmail}
-          </div>
-        )}
-        {message && (
-          <div
-            className={`p-3 mb-4 rounded ${
-              messageType === "success"
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-
-        <div className="mb-6">
-          <h2 className="font-semibold mb-2">
-            {editingUser ? "Edit Pengguna" : "Tambah Pengguna"}
-          </h2>
-          <div className="card p-4 mb-4">
-            <input
-              type="text"
-              placeholder="Nama Lengkap"
-              className="input w-full mb-2"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              className="input w-full mb-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Jabatan"
-              className="input w-full mb-2"
-              value={jabatan}
-              onChange={(e) => setJabatan(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Unit Kerja"
-              className="input w-full mb-2"
-              value={unitKerja}
-              onChange={(e) => setUnitKerja(e.target.value)}
-            />
-            {!editingUser && (
-              <>
-                <input
-                  type="password"
-                  placeholder="Kata Sandi"
-                  className="input w-full mb-2"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="input w-full mb-2"
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </>
-            )}
-            {editingUser ? (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleUpdateUser}
-                  className="bg-yellow-500 text-white py-2 px-4 rounded"
-                >
-                  Simpan
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingUser(null);
-                    setEmail("");
-                    setFullName("");
-                    setJabatan("");
-                    setUnitKerja("");
-                  }}
-                  className="bg-gray-300 py-2 px-4 rounded"
-                >
-                  Batal
-                </button>
-              </div>
-            ) : (
+        {/* MAIN */}
+        <main className="flex-1 overflow-y-auto bg-sky-500 px-4 py-4">
+          {/* --- Tab Tambah Pengguna --- */}
+          {activeTab === "tambah" && !editingUser && (
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="font-semibold mb-3 text-gray-700">
+                Tambah Pengguna
+              </h2>
+              <input
+                type="text"
+                placeholder="Nama Lengkap"
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Jabatan"
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                value={jabatan}
+                onChange={(e) => setJabatan(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Unit Kerja"
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                value={unitKerja}
+                onChange={(e) => setUnitKerja(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Kata Sandi"
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full mb-2 px-3 py-2 border rounded text-gray-800"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
               <button
                 onClick={handleAddUser}
-                className="btn-primary w-full mt-2"
+                className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded"
+                disabled={adding}
               >
-                Tambah Pengguna
+                {adding ? "Menyimpan..." : "Tambah Pengguna"}
               </button>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
 
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold mb-2 mt-8">Daftar Pengguna</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={refreshUsers}
-              className="bg-slate-600 text-white px-3 py-1 rounded text-sm"
-            >
-              Refresh
-            </button>
-            {loadingUsers && (
-              <div className="text-sm text-neutral-400">Memuat...</div>
-            )}
-          </div>
-        </div>
-        {fetchErrorDetail && (
-          <div className="text-sm text-red-300 mb-2">
-            Detail: {fetchErrorDetail}
-          </div>
-        )}
-        <div className="overflow-x-auto">
-          <div className="bg-white rounded shadow p-4">
-            <table className="min-w-full text-left">
-              <thead>
-                <tr className="text-sm text-neutral-300 border-b">
-                  <th className="p-3">Nama</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Jabatan</th>
-                  <th className="p-3">Unit Kerja</th>
-                  <th className="p-3">Role</th>
-                  <th className="p-3">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-4 text-neutral-400">
-                      Belum ada pengguna
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u) => (
-                    <tr key={u.id} className="border-b border-neutral-700">
-                      <td className="p-3">{u.full_name}</td>
-                      <td className="p-3">{u.email}</td>
-                      <td className="p-3">{u.jabatan}</td>
-                      <td className="p-3">{u.unit_kerja}</td>
-                      <td className="p-3">{u.role}</td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditInit(u)}
-                            className="bg-yellow-400 px-2 py-1 rounded text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="bg-red-500 px-2 py-1 rounded text-sm text-white"
-                          >
-                            Hapus
-                          </button>
+          {/* --- Tab Daftar Pengguna --- */}
+          {activeTab === "daftar" && (
+            <div className="bg-white rounded-lg shadow-md p-4">
+              {!editingUser ? (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-semibold text-gray-700">
+                      Daftar Pengguna
+                    </h2>
+                    <button
+                      onClick={refreshUsers}
+                      className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-full shadow"
+                    >
+                      {loadingUsers ? "..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  {users.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Belum ada pengguna</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {users.map((u) => (
+                        <div
+                          key={u.id}
+                          className="bg-white rounded-lg shadow p-3 flex justify-between items-center"
+                        >
+                          <div>
+                            <div className="font-semibold text-gray-800">
+                              {u.full_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {u.email}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {u.role}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              className="text-indigo-600 hover:text-indigo-800"
+                              title="Edit"
+                              onClick={() => handleEditUser(u)}
+                            >
+                              <FiEdit2 />
+                            </button>
+                            <button
+                              className="text-red-500 hover:text-red-700"
+                              title="Hapus"
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={deletingId === u.id}
+                            >
+                              {deletingId === u.id ? "..." : <FiTrash2 />}
+                            </button>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                // FORM EDIT (tetap di tab daftar)
+                <div className="bg-white rounded-lg shadow-md p-4">
+                  <h2 className="font-semibold mb-3 text-gray-700">
+                    Edit Pengguna
+                  </h2>
+                  <input
+                    type="text"
+                    placeholder="Nama Lengkap"
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Jabatan"
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                    value={jabatan}
+                    onChange={(e) => setJabatan(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Unit Kerja"
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                    value={unitKerja}
+                    onChange={(e) => setUnitKerja(e.target.value)}
+                  />
+                  {/* Password tidak dikirim ke PUT di backend saat edit */}
+                  <input
+                    type="password"
+                    placeholder="Kata Sandi (opsional - tidak tersimpan di contoh ini)"
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled
+                  />
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveEdit}
+                      className="flex-1 bg-sky-500 hover:bg-sky-600 text-white py-2 rounded"
+                      disabled={saving}
+                    >
+                      {saving ? "Menyimpan..." : "Simpan"}
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded"
+                      disabled={saving}
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* NAVIGATION */}
+        <nav className="flex border-t bg-white shadow">
+          <button
+            className={`flex-1 flex flex-col items-center py-2 text-sm ${
+              activeTab === "tambah"
+                ? "text-sky-600 font-semibold"
+                : "text-gray-400"
+            }`}
+            onClick={() => {
+              setEditingUser(null);
+              resetForm();
+              setActiveTab("tambah");
+            }}
+          >
+            <FiUserPlus className="text-lg mb-1" />
+            Tambah Pengguna
+          </button>
+          <button
+            className={`flex-1 flex flex-col items-center py-2 text-sm ${
+              activeTab === "daftar"
+                ? "text-sky-600 font-semibold"
+                : "text-gray-400"
+            }`}
+            onClick={() => {
+              setEditingUser(null);
+              resetForm();
+              setActiveTab("daftar");
+            }}
+          >
+            <FiUsers className="text-lg mb-1" />
+            Daftar Pengguna
+          </button>
+        </nav>
       </div>
     </div>
   );
