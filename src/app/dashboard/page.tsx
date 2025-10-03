@@ -121,20 +121,15 @@ export default function Dashboard() {
     return () => clearInterval(cron);
   }, [todayISO]);
 
-  /* const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }; */
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-500 to-sky-300 flex flex-col items-center p-6">
+    <div className="min-h-screen bg-sky-400 flex flex-col items-center">
       {/* HEADER */}
       <header className="w-full max-w-md mt-6 relative">
         {/* menu */}
         <div className="absolute left-0 top-0 mt-2 ml-2">
           <button
             onClick={() => setMenuOpen((s) => !s)}
-            className="p-2 rounded bg-white/20 text-white"
+            className="p-2 rounded bg-white/30 text-white"
             aria-label="Menu"
           >
             <svg
@@ -159,12 +154,6 @@ export default function Dashboard() {
                   <a href="/profile" className="block px-2 py-1 text-sky-700">
                     Profile
                   </a>
-                  {/* <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-2 py-1 text-red-600"
-                  >
-                    Logout
-                  </button> */}
                 </>
               ) : (
                 <a href="/login" className="block px-2 py-1 text-sky-700">
@@ -177,8 +166,8 @@ export default function Dashboard() {
 
         {/* judul */}
         <div className="text-center text-white">
-          <h1 className="text-3xl font-extrabold tracking-widest">PRESENSI</h1>
-          <div className="mt-3 text-sm">
+          <h1 className="text-3xl font-extrabold">PRESENSI</h1>
+          <div className="mt-2 text-sm">
             Hari ini, {dateString}
             <div className="mt-1 text-lg font-semibold">{currentTime}</div>
           </div>
@@ -186,17 +175,17 @@ export default function Dashboard() {
       </header>
 
       {/* MAIN */}
-      <main className="w-full max-w-md mt-6">
+      <main className="w-full max-w-md mt-6 px-4">
         {/* status absensi */}
-        <section className="bg-white/90 backdrop-blur-md rounded-xl p-4 shadow-md">
-          <div className="flex justify-between items-start">
-            <div>
+        <section className="bg-white rounded-xl p-4 shadow-md">
+          <div className="grid grid-cols-2 divide-x divide-gray-300">
+            <div className="text-center">
               <div className="text-xs text-gray-500">Masuk</div>
               <div className="text-lg font-semibold text-gray-800">
                 {attendance?.check_in || "-"}
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-center">
               <div className="text-xs text-gray-500">Pulang</div>
               <div className="text-lg font-semibold text-gray-800">
                 {attendance?.check_out || "-"}
@@ -222,11 +211,11 @@ export default function Dashboard() {
         <section className="grid grid-cols-2 gap-4 mt-5">
           <a
             href="/presensi"
-            className="bg-white/95 rounded-lg p-4 flex flex-col items-center shadow-inner"
+            className="bg-white rounded-lg p-4 flex flex-col items-center shadow"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 mb-2"
+              className="h-10 w-10 mb-2 text-gray-700"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -238,21 +227,21 @@ export default function Dashboard() {
                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span className="text-sm">Presensi</span>
+            <span className="text-sm font-semibold">Presensi</span>
           </a>
           <a
             href="/rekap"
-            className="bg-white/95 rounded-lg p-4 flex flex-col items-center shadow-inner"
+            className="bg-white rounded-lg p-4 flex flex-col items-center shadow"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 mb-2"
+              className="h-10 w-10 mb-2 text-gray-700"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
               <path d="M3 13h2v-2H3v2zm4 0h2v-4H7v4zm4 0h2V7h-2v6zm4 0h2v-8h-2v8zm4 0h2v-6h-2v6z" />
             </svg>
-            <span className="text-sm">Rekap Presensi</span>
+            <span className="text-sm font-semibold">Rekap Presensi</span>
           </a>
         </section>
       </main>
