@@ -16,55 +16,67 @@ type Attendance = {
 };
 
 export default function Dashboard() {
-  const [, /* user */ setUser] = useState<User | null>(null);
+  const [, setUser] = useState<User | null>(null);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
   const [dateString, setDateString] = useState<string>("");
+  const [todayISO, setTodayISO] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // ambil data user & attendance
   useEffect(() => {
-    const getUser = async () => {
+    const loadUserAndAttendance = async () => {
+      const today = new Date().toISOString().split("T")[0];
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
         setUser(user as User | null);
         setIsAuthenticated(!!user);
+
         if (user) {
           const { data } = await supabase
             .from("attendance")
             .select("*")
             .eq("user_id", user.id)
-            .eq("date", new Date().toISOString().split("T")[0])
+            .eq("date", today)
             .single();
-          if (data) setAttendance(data as Attendance);
-          else {
-            // try fallback
-            try {
-              const fb = localStorage.getItem("absen-fallback");
-              if (fb) {
-                const obj = JSON.parse(fb);
+
+          if (data) {
+            setAttendance(data as Attendance);
+          } else {
+            // fallback localStorage
+            const fb = localStorage.getItem("absen-fallback");
+            if (fb) {
+              const obj = JSON.parse(fb);
+              if (obj.date === today) {
                 setAttendance({
                   user_id: user.id,
                   date: obj.date,
                   check_in: obj.check_in,
                   check_out: obj.check_out,
-                } as Attendance);
-              } else setAttendance(null);
-            } catch {
+                });
+              } else {
+                localStorage.removeItem("absen-fallback");
+                setAttendance(null);
+              }
+            } else {
               setAttendance(null);
             }
           }
         }
       } catch {
-        // ignore errors retrieving user/attendance
+        setAttendance(null);
       }
     };
-    getUser();
 
-    // set initial date and time only on client
+    loadUserAndAttendance();
+
+    // set tanggal & jam realtime
     setDateString(
       new Date().toLocaleDateString("id-ID", {
         day: "numeric",
@@ -73,32 +85,52 @@ export default function Dashboard() {
       })
     );
     setCurrentTime(new Date().toLocaleTimeString("id-ID", { hour12: false }));
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString("id-ID", { hour12: false }));
     }, 1000);
 
-    // check for toast set by presensi page
-    try {
-      const tmsg = localStorage.getItem("absen-toast");
-      if (tmsg) {
-        setToast(tmsg);
-        localStorage.removeItem("absen-toast");
-        setTimeout(() => setToast(null), 5000);
-      }
-    } catch {
-      /* ignore */
+    // cek toast dari localStorage
+    const tmsg = localStorage.getItem("absen-toast");
+    if (tmsg) {
+      setToast(tmsg);
+      localStorage.removeItem("absen-toast");
+      setTimeout(() => setToast(null), 5000);
     }
-    return () => clearInterval(t);
+
+    return () => clearInterval(timer);
   }, []);
 
-  const handleLogout = async () => {
+  // cron-like untuk reset ketika ganti hari
+  useEffect(() => {
+    const cron = setInterval(() => {
+      const nowISO = new Date().toISOString().split("T")[0];
+      if (nowISO !== todayISO) {
+        // reset data ke hari baru
+        setTodayISO(nowISO);
+        setAttendance(null);
+        localStorage.removeItem("absen-fallback");
+        setDateString(
+          new Date().toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })
+        );
+      }
+    }, 60 * 1000); // cek tiap 1 menit
+    return () => clearInterval(cron);
+  }, [todayISO]);
+
+  /* const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/login";
-  };
+  }; */
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-500 to-sky-300 flex flex-col items-center p-6">
+      {/* HEADER */}
       <header className="w-full max-w-md mt-6 relative">
+        {/* menu */}
         <div className="absolute left-0 top-0 mt-2 ml-2">
           <button
             onClick={() => setMenuOpen((s) => !s)}
@@ -127,12 +159,12 @@ export default function Dashboard() {
                   <a href="/profile" className="block px-2 py-1 text-sky-700">
                     Profile
                   </a>
-                  <button
+                  {/* <button
                     onClick={handleLogout}
                     className="w-full text-left px-2 py-1 text-red-600"
                   >
                     Logout
-                  </button>
+                  </button> */}
                 </>
               ) : (
                 <a href="/login" className="block px-2 py-1 text-sky-700">
@@ -143,6 +175,7 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* judul */}
         <div className="text-center text-white">
           <h1 className="text-3xl font-extrabold tracking-widest">PRESENSI</h1>
           <div className="mt-3 text-sm">
@@ -152,14 +185,15 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* MAIN */}
       <main className="w-full max-w-md mt-6">
+        {/* status absensi */}
         <section className="bg-white/90 backdrop-blur-md rounded-xl p-4 shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-xs text-gray-500">Masuk</div>
               <div className="text-lg font-semibold text-gray-800">
-                {attendance?.check_in || "-"}{" "}
-                {/* <div className="text-xs text-gray-400">Wfo</div> */}
+                {attendance?.check_in || "-"}
               </div>
             </div>
             <div className="text-right">
@@ -170,6 +204,8 @@ export default function Dashboard() {
             </div>
           </div>
         </section>
+
+        {/* toast */}
         {toast && (
           <div className="fixed top-6 right-6 bg-white rounded shadow p-3 text-sm">
             {toast}
@@ -182,6 +218,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* menu utama */}
         <section className="grid grid-cols-2 gap-4 mt-5">
           <a
             href="/presensi"
@@ -218,29 +255,9 @@ export default function Dashboard() {
             <span className="text-sm">Rekap Presensi</span>
           </a>
         </section>
-
-        <div className="mt-6">
-          {/* Actions area for check in/out when not using the grid button */}
-          {/* {!attendance?.check_in && (
-            <button
-              onClick={handleCheckIn}
-              className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold"
-            >
-              Presensi Masuk
-            </button>
-          )} */}
-
-          {/* {attendance?.check_in && !attendance?.check_out && (
-            <button
-              onClick={handleCheckOut}
-              className="w-full bg-red-500 text-white py-3 rounded-lg font-semibold"
-            >
-              Presensi Pulang
-            </button>
-          )} */}
-        </div>
       </main>
 
+      {/* FOOTER */}
       <footer className="w-full max-w-md mt-8 text-center text-white text-sm opacity-90">
         &nbsp;
       </footer>
