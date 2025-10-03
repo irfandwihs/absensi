@@ -2,13 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient"; // pastikan path ini benar di projectmu
 
 type AttendanceRow = {
   id: string;
   user_id: string;
   date: string; // YYYY-MM-DD
-  check_in?: string | null; // HH:MM:SS
+  check_in?: string | null;
   check_out?: string | null;
   note?: string | null;
 };
@@ -22,38 +22,46 @@ const RekapPage: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+
     const load = async () => {
       setLoading(true);
-      const { data } = await supabase.auth.getSession();
-      const user = data?.session?.user;
-      if (!user) {
-        setRows([]);
-        setLoading(false);
-        return;
-      }
+      try {
+        const { data } = await supabase.auth.getSession();
+        const user = data?.session?.user;
+        if (!user) {
+          if (mounted) setRows([]);
+          setLoading(false);
+          return;
+        }
 
-      const fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
-      const toDate = new Date(year, month, 0);
-      const toDateStr = `${year}-${String(month).padStart(2, "0")}-${String(
-        toDate.getDate()
-      ).padStart(2, "0")}`;
+        const fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
+        const toDate = new Date(year, month, 0);
+        const toDateStr = `${year}-${String(month).padStart(2, "0")}-${String(
+          toDate.getDate()
+        ).padStart(2, "0")}`;
 
-      const { data: fetched, error } = await supabase
-        .from("attendance")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("date", fromDate)
-        .lte("date", toDateStr)
-        .order("date", { ascending: true });
+        const { data: fetched, error } = await supabase
+          .from("attendance")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("date", fromDate)
+          .lte("date", toDateStr)
+          .order("date", { ascending: true });
 
-      if (error) {
-        console.error("fetch attendance error", error);
+        if (error) {
+          console.error("fetch attendance error", error);
+          if (mounted) setRows([]);
+        } else if (mounted) {
+          setRows((fetched as AttendanceRow[]) || []);
+        }
+      } catch (err) {
+        console.error("load error", err);
         if (mounted) setRows([]);
-      } else if (mounted) {
-        setRows((fetched as AttendanceRow[]) || []);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      if (mounted) setLoading(false);
     };
+
     load();
     return () => {
       mounted = false;
@@ -67,8 +75,8 @@ const RekapPage: React.FC = () => {
 
   const formatTime = (t?: string | null) => {
     if (!t) return "";
-    const [h, m, s] = t.split(":");
-    return `${h}:${m}:${s || "00"}`;
+    const [h = "00", m = "00", s = "00"] = t.split(":");
+    return `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${s.padStart(2, "0")}`;
   };
 
   return (
@@ -79,6 +87,7 @@ const RekapPage: React.FC = () => {
           <button
             onClick={() => router.back()}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
+            aria-label="Kembali"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -99,7 +108,7 @@ const RekapPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Card Rekap Presensi */}
+      {/* Content card */}
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-4 mt-8">
         <h1 className="text-lg font-semibold text-sky-700 mb-1">
           Rekap Presensi
@@ -108,7 +117,6 @@ const RekapPage: React.FC = () => {
           Presensi Harian Anda, {year}
         </p>
 
-        {/* Filter Bulan & Tahun */}
         <div className="flex items-center gap-3 mb-4">
           <label className="text-sm text-gray-600">Bulan</label>
           <select
@@ -132,7 +140,6 @@ const RekapPage: React.FC = () => {
           />
         </div>
 
-        {/* Tabel Presensi */}
         <div className="overflow-x-auto">
           <table className="w-full table-auto border rounded text-sm">
             <thead className="bg-gray-50">
