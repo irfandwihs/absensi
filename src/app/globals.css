@@ -2,7 +2,13 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827; /* primary text */
+  --card-bg: #ffffff;
+  --muted: #6b7280; /* gray-500 */
+  --input-bg: #ffffff;
+  --input-border: #e5e7eb; /* gray-200 */
+  --primary: #2563eb;
+  --primary-contrast: #ffffff;
 }
 
 @theme inline {
@@ -14,8 +20,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b1220;
+    --foreground: #e6eef8;
+    --card-bg: #0f1724;
+    --muted: #9ca3af;
+    --input-bg: rgba(255,255,255,0.03);
+    --input-border: rgba(255,255,255,0.06);
+    --primary: #3b82f6;
+    --primary-contrast: #ffffff;
   }
 }
 
@@ -23,4 +35,50 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Reusable input style matching dark/light themes */
+.input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--foreground);
+  box-shadow: none;
+}
+.input:focus {
+  outline: 2px solid rgba(59,130,246,0.25);
+}
+
+/* Card utility */
+.card {
+  background: var(--card-bg);
+  color: var(--foreground);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(16,24,40,0.06);
+}
+
+/* Primary button helper */
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-contrast);
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+}
+
+/* Make muted text more readable across light/dark */
+.text-gray-500, .text-neutral-400, .text-neutral-300, .text-gray-600 {
+  color: var(--muted) !important;
+}
+
+/* Dashboard specific helpers */
+.backdrop-blur-md {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.shadow-inner {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 1px 3px rgba(0, 0, 0, 0.06);
 }
