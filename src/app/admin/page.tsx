@@ -13,6 +13,12 @@ type User = {
   unit_kerja?: string;
 };
 
+type ApiResponse<T> = {
+  error?: string;
+  users?: T[];
+  ok?: boolean;
+};
+
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [email, setEmail] = useState("");
@@ -42,7 +48,7 @@ export default function AdminPage() {
     setLoadingUsers(true);
     try {
       const res = await fetch("/api/admin-users");
-      const json = await res.json();
+      const json: ApiResponse<User> = await res.json();
       if (res.ok) {
         setUsers(json.users || []);
       } else {
@@ -73,7 +79,6 @@ export default function AdminPage() {
   };
 
   const handleAddUser = async () => {
-    // validasi sederhana
     if (!email || !fullName || !password) {
       alert(
         "Mohon isi Nama, Email, dan Kata Sandi untuk menambahkan pengguna."
@@ -95,19 +100,18 @@ export default function AdminPage() {
           role,
         }),
       });
-      const json = await res.json();
+      const json: ApiResponse<User> = await res.json();
       if (!res.ok) {
         console.error("add user error:", json);
         alert("Gagal menambahkan pengguna: " + (json.error || "server error"));
         return;
       }
 
-      // sukses
       await refreshUsers();
       resetForm();
       setActiveTab("daftar");
       alert("Pengguna berhasil ditambahkan");
-    } catch (err: any) {
+    } catch (err) {
       console.error("add user unexpected:", err);
       alert("Terjadi kesalahan saat menambahkan pengguna");
     } finally {
@@ -121,7 +125,7 @@ export default function AdminPage() {
     setSaving(true);
     try {
       const res = await fetch("/api/admin-users", {
-        method: "PUT", // sesuai route kamu
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: editingUser.id,
@@ -130,10 +134,10 @@ export default function AdminPage() {
           jabatan,
           unit_kerja: unitKerja,
           role,
-          // password tidak dikirim karena route PUT kamu tidak menangani password update.
+          // password tidak dikirim karena route PUT contoh kita tidak menangani password update.
         }),
       });
-      const json = await res.json();
+      const json: ApiResponse<User> = await res.json();
       if (!res.ok) {
         console.error("save edit error:", json);
         alert("Gagal menyimpan perubahan: " + (json.error || "server error"));
@@ -144,7 +148,7 @@ export default function AdminPage() {
       setEditingUser(null);
       resetForm();
       alert("Perubahan berhasil disimpan");
-    } catch (err: any) {
+    } catch (err) {
       console.error("save edit unexpected:", err);
       alert("Terjadi kesalahan saat menyimpan perubahan");
     } finally {
@@ -166,7 +170,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      const json = await res.json();
+      const json: ApiResponse<User> = await res.json();
       if (!res.ok) {
         console.error("delete error:", json);
         alert("Gagal menghapus pengguna: " + (json.error || "server error"));
@@ -174,7 +178,7 @@ export default function AdminPage() {
       }
       await refreshUsers();
       alert("Pengguna dihapus");
-    } catch (err: any) {
+    } catch (err) {
       console.error("delete unexpected:", err);
       alert("Terjadi kesalahan saat menghapus pengguna");
     } finally {
@@ -207,6 +211,7 @@ export default function AdminPage() {
               <h2 className="font-semibold mb-3 text-gray-700">
                 Tambah Pengguna
               </h2>
+
               <input
                 type="text"
                 placeholder="Nama Lengkap"
@@ -353,7 +358,6 @@ export default function AdminPage() {
                     value={unitKerja}
                     onChange={(e) => setUnitKerja(e.target.value)}
                   />
-                  {/* Password tidak dikirim ke PUT di backend saat edit */}
                   <input
                     type="password"
                     placeholder="Kata Sandi (opsional - tidak tersimpan di contoh ini)"

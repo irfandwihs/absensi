@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-function getAdminClient() {
+function getAdminClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE!;
   return createClient(supabaseUrl, serviceRoleKey);
 }
+
+type UserPayload = {
+  id?: string;
+  email?: string;
+  full_name?: string;
+  jabatan?: string;
+  unit_kerja?: string;
+  role?: string;
+  password?: string;
+};
 
 // GET: daftar user
 export async function GET() {
@@ -16,16 +26,19 @@ export async function GET() {
       .select("id, full_name, email, jabatan, unit_kerja, role");
     if (error) throw error;
     return NextResponse.json({ users: data || [] });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[admin-users][GET]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
 
 // POST: tambah user baru
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body: UserPayload = await req.json();
     const { email, full_name, jabatan, unit_kerja, role, password } = body;
 
     if (!email || !password) {
@@ -37,7 +50,6 @@ export async function POST(req: Request) {
 
     const admin = getAdminClient();
 
-    // Buat akun auth di supabase
     const { data: authUser, error: authError } =
       await admin.auth.admin.createUser({
         email,
@@ -46,7 +58,6 @@ export async function POST(req: Request) {
       });
     if (authError) throw authError;
 
-    // Simpan data tambahan ke tabel users
     const { error } = await admin.from("users").insert({
       id: authUser.user?.id,
       email,
@@ -58,16 +69,19 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[admin-users][POST]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
 
 // PUT: update user
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const body: UserPayload = await req.json();
     const { id, email, full_name, jabatan, unit_kerja, role } = body;
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
@@ -79,30 +93,34 @@ export async function PUT(req: Request) {
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[admin-users][PUT]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
 
 // DELETE: hapus user
 export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
+    const body: { id?: string } = await req.json();
     const { id } = body;
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const admin = getAdminClient();
-    // hapus dari tabel users
     const { error } = await admin.from("users").delete().eq("id", id);
     if (error) throw error;
 
-    // hapus dari auth
     await admin.auth.admin.deleteUser(id);
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[admin-users][DELETE]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
