@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { auth, db } from "./lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { FiCalendar, FiMapPin, FiUser } from "react-icons/fi";
+import { AppLayout, Card, Chip, PageHeading } from "./components/ui";
 
 type User = {
   uid: string;
   email?: string;
+  displayName?: string | null;
 };
 
 type Attendance = {
@@ -18,7 +21,7 @@ type Attendance = {
 };
 
 export default function Dashboard() {
-  const [, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
   const [dateString, setDateString] = useState<string>("");
@@ -26,8 +29,6 @@ export default function Dashboard() {
     new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" }) // format lokal YYYY-MM-DD
   );
   const [toast, setToast] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // ambil data user & attendance
   useEffect(() => {
@@ -36,8 +37,6 @@ export default function Dashboard() {
       try {
         const user = auth.currentUser;
         setUser(user as User | null);
-        setIsAuthenticated(!!user);
-
         if (user) {
           const snapshot = await getDoc(doc(db, "attendance", user.uid + "_" + today));
           const data = snapshot.exists() ? snapshot.data() : null;
@@ -79,9 +78,9 @@ export default function Dashboard() {
         year: "numeric",
       })
     );
-    setCurrentTime(new Date().toLocaleTimeString("id-ID", { hour12: false }));
+    setCurrentTime(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()));
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString("id-ID", { hour12: false }));
+      setCurrentTime(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()));
     }, 1000);
 
     // cek toast dari localStorage
@@ -116,133 +115,38 @@ export default function Dashboard() {
     return () => clearInterval(cron);
   }, [todayISO]);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 11 ? "pagi" : hour < 15 ? "siang" : hour < 19 ? "sore" : "malam";
   return (
-    <div className="min-h-screen bg-sky-400 flex flex-col items-center">
-      {/* HEADER */}
-      <header className="w-full max-w-md mt-6 relative">
-        {/* menu */}
-        <div className="absolute left-0 top-0 mt-2 ml-2">
-          <button
-            onClick={() => setMenuOpen((s) => !s)}
-            className="p-2 rounded bg-white/30 text-white"
-            aria-label="Menu"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-          {menuOpen && (
-            <div className="mt-2 bg-white rounded shadow p-2 text-sm">
-              {isAuthenticated ? (
-                <a href="/profile" className="block px-2 py-1 text-sky-700">
-                  Profil
-                </a>
-              ) : (
-                <a href="/login" className="block px-2 py-1 text-sky-700">
-                  Login
-                </a>
-              )}
+    <AppLayout active="home">
+      <div className="page-stack">
+        <PageHeading title={`Selamat ${greeting}, ${user?.displayName || user?.email?.split("@")[0] || "Pengguna"}`} subtitle={`${dateString} · ${currentTime || "--:--"}`} />
+        <Card>
+          <p className="eyebrow">Presensi hari ini</p>
+          <div className="attendance-grid">
+            <div className="attendance-cell">
+              <span className="attendance-label">Masuk</span>
+              <strong className="attendance-value">{attendance?.check_in || "—"}</strong>
+              <Chip variant={attendance?.check_in ? "success" : "neutral"}>{attendance?.check_in ? "Sudah" : "Belum"}</Chip>
             </div>
-          )}
-        </div>
-
-        {/* judul */}
-        <div className="text-center text-white">
-          <h1 className="text-3xl font-extrabold">PRESENSI</h1>
-          <div className="mt-2 text-sm">
-            Hari ini, {dateString}
-            <div className="mt-1 text-lg font-semibold">{currentTime}</div>
+            <div className="attendance-cell">
+              <span className="attendance-label">Pulang</span>
+              <strong className="attendance-value">{attendance?.check_out || "—"}</strong>
+              <Chip variant={attendance?.check_out ? "success" : "neutral"}>{attendance?.check_out ? "Sudah" : "Belum"}</Chip>
+            </div>
           </div>
-        </div>
-      </header>
-
-      {/* MAIN */}
-      <main className="w-full max-w-md mt-6 px-4">
-        {/* status absensi */}
-        <section className="bg-white rounded-xl p-4 shadow-md">
-          <div className="grid grid-cols-2 divide-x divide-gray-300">
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Masuk</div>
-              <div className="text-lg font-semibold text-gray-800">
-                {attendance?.check_in || "-"}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500">Pulang</div>
-              <div className="text-lg font-semibold text-gray-800">
-                {attendance?.check_out || "-"}
-              </div>
-            </div>
+          <a href="/presensi" className="ui-button button-primary full-width" style={{ marginTop: 16 }}>Buka Presensi</a>
+        </Card>
+        {toast && <div className="status-message status-success" role="status">{toast}<button className="ui-button button-secondary button-sm" style={{ marginLeft: 12 }} onClick={() => setToast(null)}>Tutup</button></div>}
+        <section>
+          <p className="eyebrow">Pintasan</p>
+          <div className="shortcut-grid">
+            <a href="/presensi" className="shortcut-link"><FiMapPin aria-hidden="true"/><span>Presensi</span></a>
+            <a href="/rekap" className="shortcut-link"><FiCalendar aria-hidden="true"/><span>Rekap</span></a>
+            <a href="/profile" className="shortcut-link"><FiUser aria-hidden="true"/><span>Profil</span></a>
           </div>
         </section>
-
-        {/* toast */}
-        {toast && (
-          <div className="fixed top-6 right-6 bg-white rounded shadow p-3 text-sm">
-            {toast}
-            <button
-              className="ml-3 text-xs text-sky-600"
-              onClick={() => setToast(null)}
-            >
-              OK
-            </button>
-          </div>
-        )}
-
-        {/* menu utama */}
-        <section className="grid grid-cols-2 gap-4 mt-5">
-          <a
-            href="/presensi"
-            className="bg-white rounded-lg p-4 flex flex-col items-center shadow text-gray-700"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 mb-2 text-gray-700"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="text-sm font-semibold">Presensi</span>
-          </a>
-          <a
-            href="/rekap"
-            className="bg-white rounded-lg p-4 flex flex-col items-center shadow text-gray-700"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 mb-2 text-gray-700"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M3 13h2v-2H3v2zm4 0h2v-4H7v4zm4 0h2V7h-2v6zm4 0h2v-8h-2v8zm4 0h2v-6h-2v6z" />
-            </svg>
-            <span className="text-sm font-semibold">Rekap Presensi</span>
-          </a>
-        </section>
-      </main>
-
-      {/* FOOTER */}
-      <footer className="w-full max-w-md mt-8 text-center text-white text-sm opacity-90">
-        &nbsp;
-      </footer>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

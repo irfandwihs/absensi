@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { auth, db } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
+import { FiCalendar } from "react-icons/fi";
+import { AppLayout, Card, Chip, EmptyState, FieldSelect, PageHeading, Skeleton, StatusMessage } from "../components/ui";
 
 type AttendanceRow = {
   id: string;
@@ -16,9 +17,9 @@ type AttendanceRow = {
 };
 
 const RekapPage: React.FC = () => {
-  const router = useRouter();
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState(false);
   const [month, setMonth] = useState<number>(Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", month: "numeric" }).format(new Date())));
   const [year, setYear] = useState<number>(Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", year: "numeric" }).format(new Date())));
 
@@ -27,6 +28,7 @@ const RekapPage: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) { if (mounted) { setRows([]); setLoading(false); } return; }
       setLoading(true);
+      setError(false);
       try {
         const fromDate = year + "-" + String(month).padStart(2, "0") + "-01";
         const lastDay = new Date(year, month, 0).getDate();
@@ -42,7 +44,7 @@ const RekapPage: React.FC = () => {
         if (mounted) setRows(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as AttendanceRow)));
       } catch (error) {
         console.error("Gagal memuat rekap presensi:", error);
-        if (mounted) setRows([]);
+        if (mounted) { setRows([]); setError(true); }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -59,119 +61,32 @@ const RekapPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-sky-400 flex flex-col items-center p-4">
-      {/* Header */}
-      <header className="w-full flex justify-center">
-        <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
-            aria-label="Kembali"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
-          </button>
-          <h2 className="ml-3 text-base font-semibold">Rekap Presensi</h2>
-        </div>
-      </header>
-
-      {/* Content card */}
-      <div className="w-full max-w-md bg-white rounded-lg shadow-md p-4 mt-8">
-        <h1 className="text-lg font-semibold text-sky-700 mb-1">
-          Rekap Presensi
-        </h1>
-        <p className="text-sm text-gray-600 mb-4">
-          Presensi Harian Anda, {year}
-        </p>
-
-        <div className="flex items-center gap-3 mb-4">
-          <label className="text-sm text-gray-600">Bulan</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="border rounded px-2 py-1 text-sm text-gray-700"
-          >
-            {Array.from({ length: 12 }).map((_, i) => (
-              <option key={i} value={i + 1}>
-                {new Date(0, i).toLocaleString("id-ID", { month: "long" })}
-              </option>
-            ))}
-          </select>
-
-          <label className="text-sm text-gray-600">Tahun</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="border rounded px-2 py-1 w-20 text-sm text-gray-700"
-          />
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto border rounded text-sm">
-            <thead className="bg-gray-50">
-              <tr className="border-b">
-                <th className="py-2 px-3 text-left text-gray-700">Tanggal</th>
-                <th className="py-2 px-3 text-left text-gray-700">Masuk</th>
-                <th className="py-2 px-3 text-left text-gray-700">Pulang</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={3} className="py-4 text-center text-gray-500">
-                    Memuat...
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-4 text-center text-gray-500">
-                    Tidak ada data untuk bulan ini.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => {
-                  const isToday = r.date === todayStr;
-                  return (
-                    <tr
-                      key={r.id}
-                      className={`border-b last:border-b-0 ${
-                        isToday ? "bg-blue-50 font-semibold" : ""
-                      }`}
-                    >
-                      <td className="py-2 px-3 text-gray-700">{r.date}</td>
-                      <td className="py-2 px-3 text-gray-700">
-                        {formatTime(r.check_in)}
-                      </td>
-                      <td className="py-2 px-3 text-gray-700">
-                        {formatTime(r.check_out)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <p className="text-xs text-gray-500 mt-3">
-          Note: Terkadang dibutuhkan waktu dalam proses penyajian data mengingat
-          kondisi jaringan dan server
-        </p>
+    <AppLayout active="recap">
+      <div className="page-stack">
+        <PageHeading title="Rekap Presensi" subtitle="Pilih bulan dan tahun." />
+        <Card>
+          <div className="filter-grid">
+            <div className="form-field"><label htmlFor="month">Bulan</label><FieldSelect id="month" value={month} onChange={(e) => setMonth(Number(e.target.value))}>{Array.from({ length: 12 }).map((_, i) => <option key={i} value={i + 1}>{new Date(0, i).toLocaleString("id-ID", { month: "long" })}</option>)}</FieldSelect></div>
+            <div className="form-field"><label htmlFor="year">Tahun</label><FieldSelect id="year" value={year} onChange={(e) => setYear(Number(e.target.value))}>{Array.from({ length: 7 }).map((_, i) => { const value = new Date().getFullYear() - 5 + i; return <option key={value} value={value}>{value}</option>; })}</FieldSelect></div>
+          </div>
+        </Card>
+        {error && <StatusMessage variant="error">Gagal memuat daftar presensi. Periksa koneksi Anda lalu coba lagi. <button className="ui-button button-secondary button-sm" onClick={() => window.location.reload()}>Coba lagi</button></StatusMessage>}
+        {loading ? <Skeleton rows={4} /> : error ? null : rows.length === 0 ? <Card><EmptyState icon={<FiCalendar />}>Belum ada data presensi untuk bulan ini.</EmptyState></Card> : (
+          <div className="data-list">
+            {rows.map((row) => {
+              const date = new Date(`${row.date}T12:00:00`);
+              const isToday = row.date === todayStr;
+              const dateLabel = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", weekday: "short", day: "2-digit", month: "short" }).format(date);
+              const complete = Boolean(row.check_out);
+              return <Card key={row.id} className="data-card">
+                <div className="list-card-head"><strong>{dateLabel}{isToday ? " · Hari ini" : ""}</strong><Chip variant={complete ? "success" : "neutral"}>{complete ? "Lengkap" : "Belum pulang"}</Chip></div>
+                <div className="data-card-grid"><div className="attendance-cell"><span className="attendance-label">Masuk</span><strong>{formatTime(row.check_in).slice(0,5) || "—"}</strong></div><div className="attendance-cell"><span className="attendance-label">Pulang</span><strong>{formatTime(row.check_out).slice(0,5) || "—"}</strong></div></div>
+              </Card>;
+            })}
+          </div>
+        )}
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

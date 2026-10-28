@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link"
 import { auth, db } from "../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { FiUser } from "react-icons/fi";
+import { AppLayout, Button, Card, Chip } from "../components/ui";
 
 type Profile = {
   id?: string;
@@ -16,6 +17,7 @@ type Profile = {
   unit_kerja?: string;
   app_version?: string;
   avatar_url?: string;
+  role?: string;
 };
 
 export default function ProfilePage() {
@@ -36,6 +38,7 @@ export default function ProfilePage() {
         unit_kerja: data?.unit_kerja || "-",
         app_version: data?.app_version || "3.0.6",
         avatar_url: data?.avatar_url,
+        role: data?.role || "user",
       });
     });
     return unsubscribe;
@@ -46,88 +49,33 @@ export default function ProfilePage() {
     window.location.href = "/login";
   };
 
+  const name = profile?.full_name || "Pengguna";
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  const isAdmin = profile?.role === "admin";
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-500 to-sky-300 p-4 flex flex-col items-center">
-      <header className="w-full flex justify-center">
-        <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
-          <Link
-            href="/"
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
-            aria-label="Kembali"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
-          </Link>
-          <h2 className="ml-3 text-base font-semibold">Profil</h2>
-        </div>
-      </header>
-
-      <main className="w-full max-w-md mt-6 rounded-xl overflow-hidden">
-        <div className="relative h-20 bg-sky-0" />
-        <div className="-mt-10 flex flex-col items-center pb-6">
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border-4 border-white">
-            {/* avatar placeholder */}
-            {profile?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar_url}
-                alt="avatar"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="text-xl font-bold text-sky-700">
-                {(profile?.full_name || "U").charAt(0)}
-              </div>
-            )}
+    <AppLayout active="profile">
+      <div className="page-stack">
+        <Card>
+          <div className="profile-summary">
+            <div className="profile-avatar" aria-label={`Profil: ${name}`}>{profile?.avatar_url ? <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={profile.avatar_url} alt="" className="profile-avatar-image" />
+            </> : initials || <FiUser aria-hidden="true" />}</div>
+            <h1 className="page-title-inline">{profile?.full_name || "Memuat profil…"}</h1>
+            <span className="body-secondary">{profile?.email || ""}</span>
+            <Chip variant={isAdmin ? "accent" : "neutral"}>{isAdmin ? "Admin" : "User"}</Chip>
           </div>
-
-          <div className="text-center mt-3 px-4">
-            <div className="font-bold text-lg">{profile?.full_name || "-"}</div>
-            <div className="text-sm text-gray-600 mt-1">
-              {profile?.nip || "-"}
-            </div>
+        </Card>
+        <Card>
+          <div className="profile-details">
+            <div className="profile-row"><span>Jabatan</span><strong>{profile?.jabatan || "—"}</strong></div>
+            <div className="profile-row"><span>Unit kerja</span><strong>{profile?.unit_kerja || "—"}</strong></div>
+            <div className="profile-row"><span>Peran</span><strong>{isAdmin ? "Admin" : "User"}</strong></div>
           </div>
-
-          <div className="w-full px-4 mt-4">
-            <div className="card p-4">
-              <div className="mb-3">
-                <div className="text-xs text-gray-500">Jabatan</div>
-                <div className="text-sm">{profile?.jabatan || "-"}</div>
-              </div>
-              {/* <div className="mb-3">
-                <div className="text-xs text-gray-500">Golongan</div>
-                <div className="text-sm">{profile?.golongan || "-"}</div>
-              </div> */}
-              <div className="mb-3">
-                <div className="text-xs text-gray-500">Unit Kerja</div>
-                <div className="text-sm">{profile?.unit_kerja || "-"}</div>
-              </div>
-              {/* <div className="mb-4">
-                <div className="text-xs text-gray-500">App Version</div>
-                <div className="text-sm">{profile?.app_version || "3.0.6"}</div>
-              </div> */}
-
-              <div className="flex justify-center">
-                <button onClick={handleLogout} className="btn-primary">
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+        </Card>
+        <Button variant="danger-outline" className="full-width" onClick={handleLogout}>Keluar</Button>
+      </div>
+    </AppLayout>
   );
 }

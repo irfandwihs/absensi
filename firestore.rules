@@ -1,22 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
+    function signedIn() {
+      return request.auth != null;
+    }
+
     function isAdmin() {
-      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role == 'user';
-      allow update: if signedIn() && request.auth.uid == userId
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'user';
+      allow update: if signedIn()
+        && request.auth.uid == userId
         && request.resource.data.role == resource.data.role;
       allow delete: if isAdmin();
     }
 
     match /attendance/{recordId} {
-      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      allow write: if false;
+      // Attendance IDs are {uid}_{YYYY-MM-DD}; path checks also allow safe reads for missing documents.
+      allow get: if signedIn()
+        && (recordId.split('_')[0] == request.auth.uid || isAdmin());
+      allow list: if signedIn()
+        && (resource.data.user_id == request.auth.uid || isAdmin());
+      // Writes go through the authenticated server endpoint, which validates GPS distance.
+      allow create, update, delete: if false;
     }
   }
 }

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { auth } from "../lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { FiUserPlus, FiUsers, FiEdit2, FiTrash2 } from "react-icons/fi";
+import { AppLayout, Button, Card, Chip, EmptyState, FieldInput, FieldSelect, FormField, PageHeading, Skeleton, StatusMessage } from "../components/ui";
 
 type User = {
   id: string;
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<"tambah" | "daftar">("tambah");
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,6 +56,7 @@ export default function AdminPage() {
 
   const refreshUsers = useCallback(async () => {
     setLoadingUsers(true);
+    setLoadError(false);
     try {
       const res = await adminFetch("/api/admin-users");
       const json: ApiResponse<User> = await res.json();
@@ -61,10 +64,12 @@ export default function AdminPage() {
         setUsers(json.users || []);
       } else {
         console.error("refreshUsers error:", json);
+        setLoadError(true);
         alert("Gagal memuat daftar pengguna");
       }
     } catch (err) {
       console.error("refreshUsers unexpected:", err);
+      setLoadError(true);
       alert("Terjadi kesalahan saat memuat pengguna");
     } finally {
       setLoadingUsers(false);
@@ -198,250 +203,38 @@ export default function AdminPage() {
     }
   };
 
+  const inputProps = { autoComplete: "off" as const };
   return (
-    <div className="min-h-screen bg-sky-400 flex justify-center">
-      <div className="w-full max-w-sm bg-sky-100 flex flex-col">
-        {/* HEADER */}
-        <header className="flex justify-between items-center px-4 py-3 bg-sky-500 text-white shadow">
-          <h1 className="text-lg font-semibold">Admin Dashboard</h1>
-          <button
-            onClick={async () => {
-              await signOut(auth);
-              window.location.href = "/login";
-            }}
-            className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm"
-          >
-            Logout
-          </button>
-        </header>
-
-        {/* MAIN */}
-        <main className="flex-1 overflow-y-auto bg-sky-500 px-4 py-4">
-          {/* --- Tab Tambah Pengguna --- */}
-          {activeTab === "tambah" && !editingUser && (
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h2 className="font-semibold mb-3 text-gray-700">
-                Tambah Pengguna
-              </h2>
-
-              <input
-                type="text"
-                placeholder="Nama Lengkap"
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Jabatan"
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                value={jabatan}
-                onChange={(e) => setJabatan(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Unit Kerja"
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                value={unitKerja}
-                onChange={(e) => setUnitKerja(e.target.value)}
-              />
-              <input
-                type="password"
-                placeholder="Kata Sandi"
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full mb-2 px-3 py-2 border rounded text-gray-800"
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button
-                onClick={handleAddUser}
-                className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded"
-                disabled={adding}
-              >
-                {adding ? "Menyimpan..." : "Tambah Pengguna"}
-              </button>
+    <AppLayout active="admin">
+      <div className="page-stack">
+        <PageHeading title="Kelola Pengguna" subtitle="Atur akun dan akses pengguna absensi." />
+        <div className="admin-tab-nav" role="group" aria-label="Bagian pengguna">
+          <button type="button" className="admin-tab" aria-current={activeTab === "tambah" ? "page" : undefined} onClick={() => { setEditingUser(null); resetForm(); setActiveTab("tambah"); }}><FiUserPlus aria-hidden="true" /> Tambah pengguna</button>
+          <button type="button" className="admin-tab" aria-current={activeTab === "daftar" ? "page" : undefined} onClick={() => { setEditingUser(null); resetForm(); setActiveTab("daftar"); }}><FiUsers aria-hidden="true" /> Daftar pengguna</button>
+        </div>
+        {(activeTab === "tambah" || editingUser) && <Card>
+          <h2 className="card-title">{editingUser ? "Edit pengguna" : "Tambah pengguna"}</h2>
+          <div className="admin-form">
+            <FormField label="Nama lengkap" htmlFor="admin-full-name"><FieldInput id="admin-full-name" type="text" placeholder="Nama lengkap" value={fullName} onChange={(e) => setFullName(e.target.value)} {...inputProps} /></FormField>
+            <FormField label="Email" htmlFor="admin-email"><FieldInput id="admin-email" type="email" placeholder="nama@perusahaan.id" value={email} onChange={(e) => setEmail(e.target.value)} {...inputProps} /></FormField>
+            {!editingUser && <FormField label="Kata sandi sementara" htmlFor="admin-password"><FieldInput id="admin-password" type="password" placeholder="Masukkan kata sandi sementara" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" /></FormField>}
+            <FormField label="Jabatan" htmlFor="admin-jabatan"><FieldInput id="admin-jabatan" type="text" placeholder="Jabatan" value={jabatan} onChange={(e) => setJabatan(e.target.value)} {...inputProps} /></FormField>
+            <FormField label="Unit kerja" htmlFor="admin-unit"><FieldInput id="admin-unit" type="text" placeholder="Unit kerja" value={unitKerja} onChange={(e) => setUnitKerja(e.target.value)} {...inputProps} /></FormField>
+            <FormField label="Peran" htmlFor="admin-role"><FieldSelect id="admin-role" value={role} onChange={(e) => setRole(e.target.value)}><option value="user">User</option><option value="admin">Admin</option></FieldSelect></FormField>
+            <div className="admin-form-actions">
+              <Button className="full-width" onClick={() => void (editingUser ? handleSaveEdit() : handleAddUser())} disabled={adding || saving}>{adding || saving ? "Menyimpan…" : editingUser ? "Simpan" : "Tambah pengguna"}</Button>
+              {editingUser && <Button variant="secondary" className="full-width" onClick={handleCancelEdit} disabled={saving}>Batal</Button>}
             </div>
-          )}
-
-          {/* --- Tab Daftar Pengguna --- */}
-          {activeTab === "daftar" && (
-            <div className="bg-white rounded-lg shadow-md p-4">
-              {!editingUser ? (
-                <>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-700">
-                      Daftar Pengguna
-                    </h2>
-                    <button
-                      onClick={refreshUsers}
-                      className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-full shadow"
-                    >
-                      {loadingUsers ? "..." : "Refresh"}
-                    </button>
-                  </div>
-
-                  {users.length === 0 ? (
-                    <p className="text-gray-500 text-sm">Belum ada pengguna</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {users.map((u) => (
-                        <div
-                          key={u.id}
-                          className="bg-white rounded-lg shadow p-3 flex justify-between items-center"
-                        >
-                          <div>
-                            <div className="font-semibold text-gray-800">
-                              {u.full_name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {u.email}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {u.role}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              className="text-indigo-600 hover:text-indigo-800"
-                              title="Edit"
-                              onClick={() => handleEditUser(u)}
-                            >
-                              <FiEdit2 />
-                            </button>
-                            <button
-                              className="text-red-500 hover:text-red-700"
-                              title="Hapus"
-                              onClick={() => handleDeleteUser(u.id)}
-                              disabled={deletingId === u.id}
-                            >
-                              {deletingId === u.id ? "..." : <FiTrash2 />}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                // FORM EDIT (tetap di tab daftar)
-                <div className="bg-white rounded-lg shadow-md p-4">
-                  <h2 className="font-semibold mb-3 text-gray-700">
-                    Edit Pengguna
-                  </h2>
-                  <input
-                    type="text"
-                    placeholder="Nama Lengkap"
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Jabatan"
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                    value={jabatan}
-                    onChange={(e) => setJabatan(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Unit Kerja"
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                    value={unitKerja}
-                    onChange={(e) => setUnitKerja(e.target.value)}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Kata Sandi (opsional - tidak tersimpan di contoh ini)"
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800 placeholder-gray-400"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled
-                  />
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full mb-2 px-3 py-2 border rounded text-gray-800"
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveEdit}
-                      className="flex-1 bg-sky-500 hover:bg-sky-600 text-white py-2 rounded"
-                      disabled={saving}
-                    >
-                      {saving ? "Menyimpan..." : "Simpan"}
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded"
-                      disabled={saving}
-                    >
-                      Batal
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-
-        {/* NAVIGATION */}
-        <nav className="flex border-t bg-white shadow">
-          <button
-            className={`flex-1 flex flex-col items-center py-2 text-sm ${
-              activeTab === "tambah"
-                ? "text-sky-600 font-semibold"
-                : "text-gray-400"
-            }`}
-            onClick={() => {
-              setEditingUser(null);
-              resetForm();
-              setActiveTab("tambah");
-            }}
-          >
-            <FiUserPlus className="text-lg mb-1" />
-            Tambah Pengguna
-          </button>
-          <button
-            className={`flex-1 flex flex-col items-center py-2 text-sm ${
-              activeTab === "daftar"
-                ? "text-sky-600 font-semibold"
-                : "text-gray-400"
-            }`}
-            onClick={() => {
-              setEditingUser(null);
-              resetForm();
-              setActiveTab("daftar");
-            }}
-          >
-            <FiUsers className="text-lg mb-1" />
-            Daftar Pengguna
-          </button>
-        </nav>
+          </div>
+        </Card>}
+        {activeTab === "daftar" && !editingUser && <Card>
+          <div className="list-card-head"><h2 className="card-title">Daftar pengguna</h2><Button size="sm" variant="secondary" onClick={() => void refreshUsers()} disabled={loadingUsers}>{loadingUsers ? "Memuat…" : "Muat ulang"}</Button></div>
+          {loadingUsers ? <Skeleton rows={3} /> : loadError ? <StatusMessage variant="error">Gagal memuat daftar pengguna. Periksa koneksi Anda lalu coba lagi.</StatusMessage> : users.length === 0 ? <EmptyState icon={<FiUsers />}>Belum ada pengguna. Tambahkan pengguna pertama.</EmptyState> : <div className="data-list">{users.map((u) => <article key={u.id} className="admin-user-card">
+            <div><div className="list-card-head"><strong>{u.full_name || "Tanpa nama"}</strong><Chip variant={u.role === "admin" ? "accent" : "neutral"}>{u.role === "admin" ? "Admin" : "User"}</Chip></div><p className="body-secondary" style={{ margin: "5px 0 0" }}>{u.email}</p><p className="body-secondary" style={{ margin: "2px 0 0" }}>{u.jabatan || "—"} · {u.unit_kerja || "—"}</p></div>
+            <div className="admin-row-actions"><Button size="sm" variant="secondary" onClick={() => handleEditUser(u)} aria-label={`Edit ${u.full_name || u.email}`}><FiEdit2 aria-hidden="true" /> Edit</Button><Button size="sm" variant="danger-outline" onClick={() => void handleDeleteUser(u.id)} disabled={deletingId === u.id} aria-label={`Hapus ${u.full_name || u.email}`}><FiTrash2 aria-hidden="true" /> {deletingId === u.id ? "Menghapus…" : "Hapus"}</Button></div>
+          </article>)}</div>}
+        </Card>}
       </div>
-    </div>
+    </AppLayout>
   );
 }
