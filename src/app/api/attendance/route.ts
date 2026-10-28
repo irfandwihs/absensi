@@ -1,90 +1,48 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from "../../lib/firebaseAdmin";
 
-export async function POST(req: Request) {
+function jakartaDateTime(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return { date: `${value.year}-${value.month}-${value.day}`, time: `${value.hour}:${value.minute}:${value.second}` };
+}
+
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    console.log("[api/attendance] body:", body);
-    const { user_id, type, time, date } = body as {
-      user_id?: string;
-      type?: "in" | "out";
-      time?: string;
-      date?: string;
-    };
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE;
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error("[api/attendance] SUPABASE config missing");
-      return NextResponse.json(
-        { error: "Server not configured" },
-        { status: 500 }
-      );
+    const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!token) return Response.json({ error: "Silakan login." }, { status: 401 });
+    const adminAuth = getFirebaseAdminAuth();
+    let user;
+    try {
+      user = await adminAuth.verifyIdToken(token);
+    } catch {
+      return Response.json({ error: "Sesi login tidak valid. Silakan login kembali." }, { status: 401 });
     }
+    const { type } = await request.json() as { type?: string };
+    if (type !== "in" && type !== "out") return Response.json({ error: "Jenis presensi tidak valid." }, { status: 400 });
 
-    if (!user_id || !type || !time || !date) {
-      return NextResponse.json(
-        { error: "missing parameters" },
-        { status: 400 }
-      );
-    }
-
-    const admin = createClient(supabaseUrl, serviceRoleKey);
-
-    // check if today's row exists
-    const { data: existing, error: selErr } = await admin
-      .from("attendance")
-      .select("*")
-      .eq("user_id", user_id)
-      .eq("date", date)
-      .limit(1)
-      .maybeSingle();
-    if (selErr) {
-      console.error("[api/attendance] select error:", selErr);
-      return NextResponse.json(
-        { error: selErr.message || String(selErr) },
-        { status: 500 }
-      );
-    }
-
-    if (!existing) {
-      // insert new row
-      const payload: Record<string, unknown> = { user_id, date };
-      if (type === "in") payload.check_in = time;
-      if (type === "out") payload.check_out = time;
-      const { error: insErr } = await admin
-        .from("attendance")
-        .insert([payload]);
-      if (insErr) {
-        console.error("[api/attendance] insert error:", insErr);
-        return NextResponse.json(
-          { error: insErr.message || String(insErr) },
-          { status: 500 }
-        );
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    // update existing row
-    const upd: Record<string, unknown> = {};
-    if (type === "in") upd.check_in = time;
-    if (type === "out") upd.check_out = time;
-    const { error: updErr } = await admin
-      .from("attendance")
-      .update(upd)
-      .eq("user_id", user_id)
-      .eq("date", date);
-    if (updErr) {
-      console.error("[api/attendance] update error:", updErr);
-      return NextResponse.json(
-        { error: updErr.message || String(updErr) },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[api/attendance] unexpected error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const { date, time } = jakartaDateTime(new Date());
+    const ref = getFirebaseAdminDb().collection("attendance").doc(`${user.uid}_${date}`);
+    await getFirebaseAdminDb().runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.data();
+      if (type === "in" && current?.check_in) throw new Error("ALREADY_CHECKED_IN");
+      if (type === "out" && current?.check_out) throw new Error("ALREADY_CHECKED_OUT");
+      transaction.set(ref, {
+        user_id: user.uid,
+        date,
+        [type === "in" ? "check_in" : "check_out"]: time,
+      }, { merge: true });
+    });
+    return Response.json({ ok: true, date, time });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "ALREADY_CHECKED_IN") return Response.json({ error: "Presensi masuk hari ini sudah tercatat." }, { status: 409 });
+    if (message === "ALREADY_CHECKED_OUT") return Response.json({ error: "Presensi pulang hari ini sudah tercatat." }, { status: 409 });
+    if (message.includes("Firebase Admin")) return Response.json({ error: "Firebase Admin belum dikonfigurasi di server." }, { status: 500 });
+    console.error("[attendance]", error);
+    return Response.json({ error: "Gagal menyimpan presensi." }, { status: message.includes("auth/") ? 401 : 500 });
   }
 }

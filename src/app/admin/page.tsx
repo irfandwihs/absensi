@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useCallback, useEffect, useState } from "react";
+import { auth } from "../lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { FiUserPlus, FiUsers, FiEdit2, FiTrash2 } from "react-icons/fi";
 
 type User = {
@@ -35,6 +36,13 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const adminFetch = useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const token = await auth.currentUser?.getIdToken();
+    const headers = new Headers(init.headers);
+    if (token) headers.set("Authorization", "Bearer " + token);
+    return fetch(input, { ...init, headers });
+  }, []);
+
   const resetForm = () => {
     setEmail("");
     setFullName("");
@@ -44,10 +52,10 @@ export default function AdminPage() {
     setUnitKerja("");
   };
 
-  const refreshUsers = async () => {
+  const refreshUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch("/api/admin-users");
+      const res = await adminFetch("/api/admin-users");
       const json: ApiResponse<User> = await res.json();
       if (res.ok) {
         setUsers(json.users || []);
@@ -61,11 +69,15 @@ export default function AdminPage() {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [adminFetch]);
 
   useEffect(() => {
-    refreshUsers();
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) { window.location.href = "/login"; return; }
+      void refreshUsers();
+    });
+    return unsubscribe;
+  }, [refreshUsers]);
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
@@ -194,7 +206,7 @@ export default function AdminPage() {
           <h1 className="text-lg font-semibold">Admin Dashboard</h1>
           <button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await signOut(auth);
               window.location.href = "/login";
             }}
             className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm"

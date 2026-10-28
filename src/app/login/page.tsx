@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { auth, db } from "../lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -12,32 +14,21 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) setError(error.message);
-    else {
-      // check role in users table to redirect admins to /admin
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          const { data } = await supabase
-            .from("users")
-            .select("role")
-            .eq("email", user.email)
-            .single();
-          const role = data?.role || "user";
-          if (role === "admin") router.push("/admin");
-          else router.push("/dashboard");
-        } else {
-          router.push("/dashboard");
-        }
-      } catch {
-        router.push("/dashboard");
+    setError("");
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const profileRef = doc(db, "users", credential.user.uid);
+      const profile = await getDoc(profileRef);
+      if (!profile.exists()) {
+        await setDoc(profileRef, {
+          email: credential.user.email || email,
+          full_name: credential.user.displayName || email,
+          role: "user",
+        });
       }
+      router.replace(profile.data()?.role === "admin" ? "/admin" : "/");
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Login gagal.");
     }
   };
 

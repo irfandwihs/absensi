@@ -1,36 +1,20 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Absensi
 
-## Getting Started
+Aplikasi presensi berbasis Next.js dengan Firebase Authentication (email/password) dan Cloud Firestore.
 
-First, run the development server:
+## Firebase setup
+
+1. Aktifkan penyedia **Email/Password** pada Firebase Authentication.
+2. Buat database Cloud Firestore dan deploy `firestore.rules`.
+3. Tambahkan akun admin melalui Authentication, lalu buat dokumen `users/{uid}` untuk akun itu dengan `role: "admin"` dan profil yang sesuai.
+4. Untuk endpoint admin yang membuat dan menghapus akun Auth, atur kredensial Firebase Admin server-only berdasarkan `.env.example`. Jangan pernah memakai private key service account di variabel `NEXT_PUBLIC_*` atau mengirimkannya ke browser.
+5. Akun yang masuk tanpa dokumen profil akan dibuat sebagai `role: "user"` secara otomatis.
+
+Fungsi presensi menyimpan dokumen `attendance/{uid_YYYY-MM-DD}`. Jam dan tanggal dibuat server dalam zona waktu Asia/Jakarta.
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

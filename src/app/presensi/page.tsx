@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import Link from "next/link";
+import { auth, db } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
-type User = { id: string; email?: string };
+type User = { uid: string; email?: string | null };
 type Attendance = {
   user_id: string;
   date?: string;
@@ -14,51 +17,35 @@ type Attendance = {
 export default function PresensiPage() {
   const [user, setUser] = useState<User | null>(null);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
-  const pad = (n: number) => String(n).padStart(2, "0");
 
   // helper: ambil tanggal lokal dengan format YYYY-MM-DD
-  const getToday = () => new Date().toLocaleDateString("sv-SE");
+  const getToday = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
 
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = auth.currentUser;
       setUser(user);
       if (user) {
-        const { data } = await supabase
-          .from("attendance")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("date", getToday())
-          .single();
-        setAttendance(data);
+        const snapshot = await getDoc(doc(db, "attendance", user.uid + "_" + getToday()));
+        setAttendance(snapshot.exists() ? snapshot.data() as Attendance : null);
       }
     };
-    getUser();
+    const unsubscribe = onAuthStateChanged(auth, () => { void getUser(); });
+    return unsubscribe;
   }, []);
 
   const handleCheckIn = async () => {
     if (!user) return;
-    const now = new Date();
-    const displayTime = now.toLocaleTimeString("id-ID", { hour12: false });
-    const timeForDb = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
-      now.getSeconds()
-    )}`;
-    const today = getToday();
-
+    const token = await auth.currentUser?.getIdToken();
     const res = await fetch("/api/attendance", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user.id,
-        type: "in",
-        time: timeForDb,
-        date: today,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "in" }),
     });
-    const insertJson = await res.json().catch(() => ({}));
-    console.log("[presensi] check_in response:", insertJson, res.status);
+    const result = await res.json();
+    if (!res.ok) { alert(result.error || "Presensi gagal disimpan."); return; }
+    const displayTime = result.time as string;
+    const today = result.date as string;
 
     try {
       localStorage.setItem("absen-toast", `Masuk: ${displayTime}`);
@@ -70,31 +57,21 @@ export default function PresensiPage() {
         ({ ...(prev ?? {}), check_in: displayTime, date: today } as Attendance)
     );
     try {
-      window.location.href = "/dashboard";
+      window.location.href = "/"
     } catch {}
   };
 
   const handleCheckOut = async () => {
     if (!user) return;
-    const now = new Date();
-    const displayTime = now.toLocaleTimeString("id-ID", { hour12: false });
-    const timeForDb = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
-      now.getSeconds()
-    )}`;
-    const today = getToday();
-
+    const token = await auth.currentUser?.getIdToken();
     const res = await fetch("/api/attendance", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user.id,
-        type: "out",
-        time: timeForDb,
-        date: today,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "out" }),
     });
-    const outJson = await res.json().catch(() => ({}));
-    console.log("[presensi] check_out response:", outJson, res.status);
+    const result = await res.json();
+    if (!res.ok) { alert(result.error || "Presensi gagal disimpan."); return; }
+    const displayTime = result.time as string;
 
     try {
       localStorage.setItem("absen-toast", `Pulang: ${displayTime}`);
@@ -105,7 +82,7 @@ export default function PresensiPage() {
       (prev) => ({ ...(prev ?? {}), check_out: displayTime } as Attendance)
     );
     try {
-      window.location.href = "/dashboard";
+      window.location.href = "/"
     } catch {}
   };
 
@@ -114,8 +91,8 @@ export default function PresensiPage() {
       <header className="w-full flex justify-center">
         <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
           {/* Tombol Back */}
-          <a
-            href="/dashboard"
+          <Link
+            href="/"
             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
           >
             <svg
@@ -132,7 +109,7 @@ export default function PresensiPage() {
                 d="M15.75 19.5L8.25 12l7.5-7.5"
               />
             </svg>
-          </a>
+          </Link>
 
           {/* Judul */}
           <h2 className="ml-3 text-base font-semibold">Presensi</h2>

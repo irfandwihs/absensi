@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabaseClient"; // pastikan path ini benar di projectmu
+import { auth, db } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 
 type AttendanceRow = {
   id: string;
@@ -17,61 +19,38 @@ const RekapPage: React.FC = () => {
   const router = useRouter();
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [month, setMonth] = useState<number>(Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", month: "numeric" }).format(new Date())));
+  const [year, setYear] = useState<number>(Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Jakarta", year: "numeric" }).format(new Date())));
 
   useEffect(() => {
     let mounted = true;
-
-    const load = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) { if (mounted) { setRows([]); setLoading(false); } return; }
       setLoading(true);
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data?.session?.user;
-        if (!user) {
-          if (mounted) setRows([]);
-          setLoading(false);
-          return;
-        }
-
-        const fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
-        const toDate = new Date(year, month, 0);
-        const toDateStr = `${year}-${String(month).padStart(2, "0")}-${String(
-          toDate.getDate()
-        ).padStart(2, "0")}`;
-
-        const { data: fetched, error } = await supabase
-          .from("attendance")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("date", fromDate)
-          .lte("date", toDateStr)
-          .order("date", { ascending: true });
-
-        if (error) {
-          console.error("fetch attendance error", error);
-          if (mounted) setRows([]);
-        } else if (mounted) {
-          setRows((fetched as AttendanceRow[]) || []);
-        }
-      } catch (err) {
-        console.error("load error", err);
+        const fromDate = year + "-" + String(month).padStart(2, "0") + "-01";
+        const lastDay = new Date(year, month, 0).getDate();
+        const toDate = year + "-" + String(month).padStart(2, "0") + "-" + String(lastDay).padStart(2, "0");
+        const records = query(
+          collection(db, "attendance"),
+          where("user_id", "==", user.uid),
+          where("date", ">=", fromDate),
+          where("date", "<=", toDate),
+          orderBy("date", "asc")
+        );
+        const snapshot = await getDocs(records);
+        if (mounted) setRows(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as AttendanceRow)));
+      } catch (error) {
+        console.error("Gagal memuat rekap presensi:", error);
         if (mounted) setRows([]);
       } finally {
         if (mounted) setLoading(false);
       }
-    };
-
-    load();
-    return () => {
-      mounted = false;
-    };
+    });
+    return () => { mounted = false; unsubscribe(); };
   }, [month, year]);
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(
-    today.getMonth() + 1
-  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   const formatTime = (t?: string | null) => {
     if (!t) return "";

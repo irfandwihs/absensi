@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import Link from "next/link"
+import { auth, db } from "../lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
 type Profile = {
   id?: string;
@@ -19,43 +22,27 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Try to find extended profile in `users` table by email
-      const { data } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", user.email)
-        .single();
-      if (data) {
-        setProfile({
-          id: data.id,
-          full_name: data.full_name || user.email,
-          email: data.email || user.email,
-          nip: data.nip || "-",
-          jabatan: data.jabatan || "-",
-          golongan: data.golongan || "-",
-          unit_kerja: data.unit_kerja || "-",
-          app_version: data.app_version || "3.0.6",
-          avatar_url: data.avatar_url || undefined,
-        });
-      } else {
-        setProfile({
-          full_name: user.email,
-          email: user.email,
-          app_version: "3.0.6",
-        });
-      }
-    };
-    load();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) { window.location.href = "/login"; return; }
+      const snapshot = await getDoc(doc(db, "users", user.uid));
+      const data = snapshot.data();
+      setProfile({
+        id: user.uid,
+        full_name: data?.full_name || user.displayName || user.email || "Pengguna",
+        email: data?.email || user.email || "",
+        nip: data?.nip || "-",
+        jabatan: data?.jabatan || "-",
+        golongan: data?.golongan || "-",
+        unit_kerja: data?.unit_kerja || "-",
+        app_version: data?.app_version || "3.0.6",
+        avatar_url: data?.avatar_url,
+      });
+    });
+    return unsubscribe;
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     window.location.href = "/login";
   };
 
@@ -63,8 +50,8 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-500 to-sky-300 p-4 flex flex-col items-center">
       <header className="w-full flex justify-center">
         <div className="w-full max-w-md flex items-center px-4 py-3 text-white">
-          <a
-            href="/dashboard"
+          <Link
+            href="/"
             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition"
             aria-label="Kembali"
           >
@@ -82,7 +69,7 @@ export default function ProfilePage() {
                 d="M15.75 19.5L8.25 12l7.5-7.5"
               />
             </svg>
-          </a>
+          </Link>
           <h2 className="ml-3 text-base font-semibold">Profil</h2>
         </div>
       </header>
